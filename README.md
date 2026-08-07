@@ -63,5 +63,34 @@ Cada casa ou objeto peça do tabuleiro precisa expor pelo menos estes dois atrib
   * Renderização do tabuleiro e peças na tela.
   * Mapeamento de cliques do mouse para seleção e movimentação.
   * Gerenciamento do Loop Principal de Turnos:
+  * * Se for o turno da IA $\rightarrow$ chama `escolher_melhor_jogada(...)` e aplica a jogada.
+    * Se for o turno do Humano $\rightarrow$ aguarda o evento do mouse.
+  ---
+
+##  Estrutura de Pastas e Arquivos
+
+```text
+TRABALHO-ES2-XADREZ/
+├── main.py                    # Ponto de entrada (integra GUI, Lógica e IA)
+├── requirements.txt           # Dependências do projeto (ex: pygame)
+├── .gitignore                 # Arquivos ignorados pelo Git
+├── README.md                  # Documentação e regras de integração
+│
+├── ia/                        # Módulo de Inteligência Artificial (Minimax e Heurística)
+│   ├── __init__.py
+│   ├── minimax.py             # Algoritmo de decisão e escolha de jogadas
+│   └── avaliacao.py           # Avaliação heurística do tabuleiro
+│
+├── logica/                    # Motor de Regras e Tabuleiro
+│   ├── __init__.py
+│   ├── peca.py                # Classe Peca (.cor e .tipo)
+│   ├── tabuleiro.py           # Estado do tabuleiro e simular_movimento()
+│   └── regras.py              # gerar_movimentos_legais() e checagem de xeque
+│
+└── gui/                       # Interface Gráfica e Eventos
+    ├── __init__.py
+    ├── interface.py           # Renderização do tabuleiro e peças na tela
+    ├── menu.py                # Telas de navegação e seleção de dificuldade
+    └── assets/                # Imagens das peças (.png)
     * Se for o turno da IA $\rightarrow$ chama `escolher_melhor_jogada(...)` e aplica a jogada.
     * Se for o turno do Humano $\rightarrow$ aguarda o evento do mouse.
