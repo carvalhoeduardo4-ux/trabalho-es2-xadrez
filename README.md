@@ -1,4 +1,4 @@
-# ♟️ Projeto Xadrez com Inteligência Artificial
+# ♟️ Projeto Xadrez 
 
 ## 1. Visão Geral
 O nosso jogo dará suporte a 3 modos de partida:
