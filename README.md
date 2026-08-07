@@ -92,5 +92,4 @@ TRABALHO-ES2-XADREZ/
     ├── interface.py           # Renderização do tabuleiro e peças na tela
     ├── menu.py                # Telas de navegação e seleção de dificuldade
     └── assets/                # Imagens das peças (.png)
-    * Se for o turno da IA $\rightarrow$ chama `escolher_melhor_jogada(...)` e aplica a jogada.
-    * Se for o turno do Humano $\rightarrow$ aguarda o evento do mouse.
+    
