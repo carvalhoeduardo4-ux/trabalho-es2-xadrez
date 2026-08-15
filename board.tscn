@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://ck5sjk6vf2xf6"]
+
+[ext_resource type="Texture2D" uid="uid://cvtyb4gj5y33x" path="res://Assets/Chess_board.png" id="1_psm7c"]
+[ext_resource type="Script" uid="uid://6pbuhklugehx" path="res://chess.gd" id="2_8l818"]
+
+[node name="board" type="Sprite2D" unique_id=2019754039]
+texture = ExtResource("1_psm7c")
+script = ExtResource("2_8l818")
+
+[node name="pieces" type="Node2D" parent="." unique_id=341556335]
+
+[node name="dots" type="Node2D" parent="." unique_id=1889529971]
+
+[node name="turn" type="Sprite2D" parent="." unique_id=847885020]
