@@ -1,7 +1,11 @@
 [gd_scene format=3 uid="uid://bqx8pbvrfoous"]
 
+[ext_resource type="PackedScene" uid="uid://ck5sjk6vf2xf6" path="res://board.tscn" id="1_ig7tw"]
+
 [node name="Main" type="Node2D" unique_id=1615125846]
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1029429263]
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=845104137]
+
+[node name="board" parent="." unique_id=2019754039 instance=ExtResource("1_ig7tw")]
