@@ -7,5 +7,7 @@
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1029429263]
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=845104137]
+scale = Vector2(3.5, 3.5)
+transform = Transform2D(3.5, 0, 0, 3.5, 0, 0)
 
 [node name="board" parent="." unique_id=2019754039 instance=ExtResource("1_ig7tw")]
