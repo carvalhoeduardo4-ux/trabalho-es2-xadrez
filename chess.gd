@@ -3,6 +3,7 @@ extends Sprite2D
 const BOARD_SIZE = 8
 const CELL_WIDTH = 18
 const BOARD_PIXEL_SIZE = BOARD_SIZE * CELL_WIDTH
+const TARGET_PIECE_SIZE = Vector2(16, 16)
 
 const TEXTURE_HOLDER = preload("res://Scenes/texture_holder.tscn")
 
@@ -23,21 +24,6 @@ const PIECE_MOVE = preload("res://Assets/Piece_move.png")
 
 @onready var pieces = $pieces
 @onready var dots = $dots
-
-# Piece values:
-# -6 = black king
-# -5 = black queen
-# -4 = black rook
-# -3 = black bishop
-# -2 = black knight
-# -1 = black pawn
-#  0 = empty
-#  1 = white pawn
-#  2 = white knight
-#  3 = white bishop
-#  4 = white rook
-#  5 = white queen
-#  6 = white king
 
 var board: Array = []
 var white: bool = true
@@ -69,7 +55,6 @@ func _input(event):
 			var row = int(board_pos.x)
 			var col = int(board_pos.y)
 
-			# At this stage we only select a piece and calculate/show its moves.
 			if board[row][col] != 0:
 				white = board[row][col] > 0
 				selected_piece = Vector2(row, col)
@@ -96,6 +81,18 @@ func board_to_local_position(row: int, col: int):
 	)
 
 
+func apply_texture_and_scale(holder: Node, texture: Texture2D):
+	holder.texture = texture
+	
+	# Only scale if the holder belongs to the "pieces" group
+	if texture and holder.is_in_group("pieces"):
+		var tex_size = texture.get_size()
+		holder.scale = Vector2(
+			TARGET_PIECE_SIZE.x / tex_size.x,
+			TARGET_PIECE_SIZE.y / tex_size.y
+		)
+
+
 func display_board():
 	for child in pieces.get_children():
 		child.queue_free()
@@ -103,42 +100,46 @@ func display_board():
 	for i in BOARD_SIZE:
 		for j in BOARD_SIZE:
 			var holder = TEXTURE_HOLDER.instantiate()
+			holder.add_to_group("pieces") # Add piece nodes to the "pieces" group
 			pieces.add_child(holder)
 			holder.position = board_to_local_position(i, j)
 
+			var tex: Texture2D = null
 			match board[i][j]:
-				-6: holder.texture = BLACK_KING
-				-5: holder.texture = BLACK_QUEEN
-				-4: holder.texture = BLACK_ROOK
-				-3: holder.texture = BLACK_BISHOP
-				-2: holder.texture = BLACK_KNIGHT
-				-1: holder.texture = BLACK_PAWN
-				0: holder.texture = null
-				1: holder.texture = WHITE_PAWN
-				2: holder.texture = WHITE_KNIGHT
-				3: holder.texture = WHITE_BISHOP
-				4: holder.texture = WHITE_ROOK
-				5: holder.texture = WHITE_QUEEN
-				6: holder.texture = WHITE_KING
+				-6: tex = BLACK_KING
+				-5: tex = BLACK_QUEEN
+				-4: tex = BLACK_ROOK
+				-3: tex = BLACK_BISHOP
+				-2: tex = BLACK_KNIGHT
+				-1: tex = BLACK_PAWN
+				1: tex = WHITE_PAWN
+				2: tex = WHITE_KNIGHT
+				3: tex = WHITE_BISHOP
+				4: tex = WHITE_ROOK
+				5: tex = WHITE_QUEEN
+				6: tex = WHITE_KING
 
-
-func show_options():
-	delete_dots()
-	moves = get_moves(selected_piece)
-	show_dots()
+			apply_texture_and_scale(holder, tex)
 
 
 func show_dots():
 	for move in moves:
 		var holder = TEXTURE_HOLDER.instantiate()
 		dots.add_child(holder)
-		holder.texture = PIECE_MOVE
+		# Dots do not join the "pieces" group, so they won't be scaled
+		apply_texture_and_scale(holder, PIECE_MOVE)
 		holder.position = board_to_local_position(int(move.x), int(move.y))
 
 
 func delete_dots():
 	for child in dots.get_children():
 		child.queue_free()
+
+
+func show_options():
+	delete_dots()
+	moves = get_moves(selected_piece)
+	show_dots()
 
 
 func get_moves(selected: Vector2):
@@ -298,18 +299,15 @@ func get_pawn_moves(piece_position: Vector2):
 	elif not white and piece_position.x == 6:
 		is_first_move = true
 
-	# One square forward.
 	var pos = piece_position + direction
 	if is_valid_position(pos) and is_empty(pos):
 		_moves.append(pos)
 
-	# Two squares forward from the starting rank.
 	pos = piece_position + direction * 2
 	if is_first_move and is_valid_position(pos):
 		if is_empty(piece_position + direction) and is_empty(pos):
 			_moves.append(pos)
 
-	# Captures diagonally.
 	pos = piece_position + Vector2(direction.x, 1)
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
