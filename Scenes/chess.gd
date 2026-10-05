@@ -30,6 +30,8 @@ const TURN_WHITE = preload("res://Assets/turn-white.png")
 @onready var pieces: Node2D = $pieces
 @onready var dots: Node2D = $dots
 @onready var turn: Sprite2D = $turn
+@onready var white_pieces: Control = $"../../CanvasLayer/white_pieces"
+@onready var black_pieces: Control = $"../../CanvasLayer/black_pieces"
 
 
 # -6 = Rei preto
@@ -52,6 +54,8 @@ var state: bool = false
 var moves: Array = []
 var selected_piece: Vector2
 
+var promotion_square = null
+
 
 func _ready():
 	board.append([-4, -2, -3, -5, -6, -3, -2, -4])
@@ -63,10 +67,18 @@ func _ready():
 	board.append([1, 1, 1, 1, 1, 1, 1, 1])
 	board.append([4, 2, 3, 5, 6, 3, 2, 4])
 	display_board()
-
+	
+	var white_buttons = get_tree().get_nodes_in_group("white_pieces")
+	var black_buttons = get_tree().get_nodes_in_group("black_pieces")
+	
+	for button in white_buttons:
+		button.pressed.connect(self._on_button_pressed.bind(button))
+		
+	for button in black_buttons:
+		button.pressed.connect(self._on_button_pressed.bind(button))
 
 func _input(event):
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton and event.pressed && promotion_square == null:
 		if event.button_index != MOUSE_BUTTON_LEFT:
 			return
 
@@ -223,7 +235,20 @@ func set_move(row: int, col: int):
 	# Verifica se a posição clicada é um movimento válido
 	for move in moves:
 		if move.x == row and move.y == col:
-
+			match board[selected_piece.x][selected_piece.y]:
+				1:
+					if move.x == 0:
+						promote(move)
+						delete_dots()
+						state = false
+						return
+				-1:
+					if move.x == 7:
+						promote(move)
+						delete_dots()
+						state = false
+						return
+			
 			# Move a peça
 			board[row][col] = board[selected_piece.x][selected_piece.y]
 
@@ -471,3 +496,18 @@ func is_enemy(pos: Vector2):
 		return true
 
 	return false
+	
+func promote(_var : Vector2):
+	promotion_square = _var
+	board[selected_piece.x][selected_piece.y] = 0
+	white_pieces.visible = white
+	black_pieces.visible = !white
+	
+func _on_button_pressed(button):
+	var num_char = int(button.name.substr(0, 1))
+	board[promotion_square.x][promotion_square.y] = num_char if white else -num_char
+	white_pieces.visible = false
+	black_pieces.visible = false
+	promotion_square = null
+	white = not white
+	display_board()
