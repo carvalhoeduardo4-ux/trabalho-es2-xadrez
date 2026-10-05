@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bqx8pbvrfoous"]
 
-[ext_resource type="PackedScene" uid="uid://ck5sjk6vf2xf6" path="res://board.tscn" id="1_ig7tw"]
+[ext_resource type="PackedScene" uid="uid://ck5sjk6vf2xf6" path="res://Scenes/board.tscn" id="1_ig7tw"]
 [ext_resource type="Texture2D" uid="uid://be3xn4nschf06" path="res://Assets/white_knight.png" id="2_kek77"]
 [ext_resource type="Texture2D" uid="uid://ddbkod7uv8lsw" path="res://Assets/white_bishop.png" id="3_4c57u"]
 [ext_resource type="Texture2D" uid="uid://wtrrisakaeua" path="res://Assets/white_rook.png" id="4_efxa6"]
