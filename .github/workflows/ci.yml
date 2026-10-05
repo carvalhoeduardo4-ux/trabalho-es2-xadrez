@@ -1,0 +1,25 @@
+name: Godot CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Godot 4.7.1
+        run: |
+          wget https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -o Godot_v4.7.1-stable_linux.x86_64.zip
+          chmod +x Godot_v4.7.1-stable_linux.x86_64
+
+      - name: Validate project
+        run: |
+          ./Godot_v4.7.1-stable_linux.x86_64 --headless --editor --path . --quit
