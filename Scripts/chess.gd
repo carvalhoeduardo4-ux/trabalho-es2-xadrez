@@ -56,6 +56,9 @@ var selected_piece: Vector2
 
 var promotion_square = null
 
+var fifty_move_rule = 0
+var unique_board_moves : Array = []
+var amount_of_same : Array = []
 
 func _ready():
 	board.append([-4, -2, -3, -5, -6, -3, -2, -4])
@@ -249,6 +252,11 @@ func set_move(row: int, col: int):
 						state = false
 						return
 			
+			#Lógica da Regra dos 50 Movimentos
+			fifty_move_rule += 1
+			if is_enemy(Vector2(row, col)) or abs(board[selected_piece.x][selected_piece.y]) == 1:
+				fifty_move_rule = 0
+
 			# Move a peça
 			board[row][col] = board[selected_piece.x][selected_piece.y]
 
@@ -260,6 +268,10 @@ func set_move(row: int, col: int):
 
 			# Atualiza o tabuleiro
 			display_board()
+
+			#Verificações de Empate (50 lances, material insuficiente ou repetição tríplice)
+			if fifty_move_rule == 50 or insuficient_material() or threefold_position(board):
+				print("draw)
 
 			break
 
@@ -511,3 +523,31 @@ func _on_button_pressed(button):
 	promotion_square = null
 	white = not white
 	display_board()
+
+func insuficient_material() -> bool:
+	var white_piece = 0
+	var black_piece = 0
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			match board[i][j]:
+				2, 3:
+					if white_piece == 0: white_piece += 1
+					else: return false
+				-2, -3:
+					if black_piece == 0: black_piece += 1
+					else: return false
+				6, -6, 0: pass
+				_:
+					return false
+	return true
+
+func threefold_position(var1 : Array) -> bool:
+	for i in unique_board_moves.size():
+		if var1 == unique_board_moves[i]:
+			amount_of_same[i] += 1
+			if amount_of_same[i] >= 3: return true
+	unique_board_moves.append(var1.duplicate(true))
+	amount_of_same.append(1)
+	
+	return false
