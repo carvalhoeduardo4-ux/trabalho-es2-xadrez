@@ -55,6 +55,7 @@ var moves: Array = []
 var selected_piece: Vector2
 var w_king_moved : bool = false
 var b_king_moved : bool = false
+var en_passant: Vector2
 
 var promotion_square = null
 
@@ -250,6 +251,21 @@ func set_move(row: int, col: int):
 						delete_dots()
 						state = false
 						return
+
+			# Esvazia a posição sofrida pelo en passant
+			if en_passant == Vector2(row-1,col) and board[selected_piece.x][selected_piece.y] == 1:
+				board[row+1][col] = 0
+			elif en_passant == Vector2(row+1,col) and board[selected_piece.x][selected_piece.y] == -1:
+				board[row-1][col] = 0
+			
+			# Passagem do posto do en passante entre os peões da rodada
+			if white and board[selected_piece.x][selected_piece.y] == 1 and selected_piece.x == 6 and row == 4:
+				en_passant = selected_piece
+			elif not white and board[selected_piece.x][selected_piece.y] == -1 and selected_piece.x == 1 and row == 3:
+				en_passant = selected_piece
+			else:
+				en_passant = Vector2(-1,-1)
+			
 			
 			# Move a peça
 			board[row][col] = board[selected_piece.x][selected_piece.y]
@@ -488,6 +504,15 @@ func get_pawn_moves():
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
+	
+	
+	# Verificar se é possível realizar o en passante pela direita
+	if white:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x-1,pos.y):
+			_moves.append(pos)
+	else:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
+			_moves.append(pos)
 
 
 	# Captura diagonal esquerda
@@ -495,7 +520,17 @@ func get_pawn_moves():
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
-
+	
+	
+	# Verificar se é possível realizar o en passante pela esquerda
+	if white:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x-1,pos.y):
+			_moves.append(pos)
+	else:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
+			_moves.append(pos)
+	
+	
 	return _moves
 
 
