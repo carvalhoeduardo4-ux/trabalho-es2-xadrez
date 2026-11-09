@@ -53,6 +53,9 @@ var white: bool = true
 var state: bool = false
 var moves: Array = []
 var selected_piece: Vector2
+var w_king_moved : bool = false
+var b_king_moved : bool = false
+var en_passant: Vector2
 
 var promotion_square = null
 
@@ -248,12 +251,35 @@ func set_move(row: int, col: int):
 						delete_dots()
 						state = false
 						return
+
+			# Esvazia a posição sofrida pelo en passant
+			if en_passant == Vector2(row-1,col) and board[selected_piece.x][selected_piece.y] == 1:
+				board[row+1][col] = 0
+			elif en_passant == Vector2(row+1,col) and board[selected_piece.x][selected_piece.y] == -1:
+				board[row-1][col] = 0
+			
+			# Passagem do posto do en passante entre os peões da rodada
+			if white and board[selected_piece.x][selected_piece.y] == 1 and selected_piece.x == 6 and row == 4:
+				en_passant = selected_piece
+			elif not white and board[selected_piece.x][selected_piece.y] == -1 and selected_piece.x == 1 and row == 3:
+				en_passant = selected_piece
+			else:
+				en_passant = Vector2(-1,-1)
+			
 			
 			# Move a peça
 			board[row][col] = board[selected_piece.x][selected_piece.y]
 
 			# Esvazia a posição antiga
 			board[selected_piece.x][selected_piece.y] = 0
+			
+			# Verifica se o rei se moveu
+			if not w_king_moved and white and not board[7][4] == 6:
+				w_king_moved = true
+				roque(row, col)
+			if not b_king_moved and not white and not board[0][4] == -6:
+				b_king_moved = true
+				roque(row, col)
 
 			# Troca o turno
 			white = not white
@@ -398,6 +424,20 @@ func get_king_moves():
 		if is_valid_position(pos):
 			if is_empty(pos) or is_enemy(pos):
 				_moves.append(pos)
+	
+	# Adiciona as posições do roque
+	if white:
+		if not w_king_moved:
+			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[7][7] == 4:
+				_moves.append(selected_piece + Vector2(0,2))
+			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[7][0] == 4:
+				_moves.append(selected_piece + Vector2(0,-3))
+	else:
+		if not b_king_moved:
+			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[0][7] == -4:
+				_moves.append(selected_piece + Vector2(0,2))
+			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[0][0] == -4:
+				_moves.append(selected_piece + Vector2(0,-3))
 
 	return _moves
 
@@ -464,6 +504,15 @@ func get_pawn_moves():
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
+	
+	
+	# Verificar se é possível realizar o en passante pela direita
+	if white:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x-1,pos.y):
+			_moves.append(pos)
+	else:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
+			_moves.append(pos)
 
 
 	# Captura diagonal esquerda
@@ -471,7 +520,17 @@ func get_pawn_moves():
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
-
+	
+	
+	# Verificar se é possível realizar o en passante pela esquerda
+	if white:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x-1,pos.y):
+			_moves.append(pos)
+	else:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
+			_moves.append(pos)
+	
+	
 	return _moves
 
 
@@ -511,3 +570,13 @@ func _on_button_pressed(button):
 	promotion_square = null
 	white = not white
 	display_board()
+
+
+func roque(row: int,col: int):
+	if board[row][col + 1] == 4 or board[row][col + 1] == -4:
+		board[row][col-1] = board[row][col+1]
+		board[row][col+1] = 0
+	else:
+		if  board[row][col - 1] == 4 or board[row][col - 1] == -4:
+			board[row][col+1] = board[row][col-1]
+			board[row][col-1] = 0
