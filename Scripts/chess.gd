@@ -108,8 +108,8 @@ func _input(event):
 			# Só pode selecionar peça da cor que está jogando
 			if (white and board[row][col] > 0) or (not white and board[row][col] < 0):
 				selected_piece = Vector2(row, col)
-				show_options()
 				state = true
+				show_options()
 
 		# Já existe uma peça selecionada
 		else:
