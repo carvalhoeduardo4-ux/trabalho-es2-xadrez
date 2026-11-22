@@ -55,7 +55,11 @@ var moves: Array = []
 var selected_piece: Vector2
 var w_king_moved : bool = false
 var b_king_moved : bool = false
-var en_passant: Vector2
+var w_rook_left_moved : bool = false
+var w_rook_right_moved : bool = false
+var b_rook_left_moved : bool = false
+var b_rook_right_moved : bool = false
+var en_passant: Vector2 = Vector2(-1,-1)
 
 var promotion_square = null
 
@@ -276,16 +280,31 @@ func set_move(row: int, col: int):
 			# Verifica se o rei se moveu
 			if not w_king_moved and white and not board[7][4] == 6:
 				w_king_moved = true
-				roque(row, col)
+				if abs(col - selected_piece.y) == 2:
+					roque(row, col)
 			if not b_king_moved and not white and not board[0][4] == -6:
 				b_king_moved = true
-				roque(row, col)
+				if abs(col - selected_piece.y) == 2:
+					roque(row, col)
+
+			# Verifica se as torres saíram (ou foram capturadas) da casa original
+			if not board[7][0] == 4:
+				w_rook_left_moved = true
+			if not board[7][7] == 4:
+				w_rook_right_moved = true
+			if not board[0][0] == -4:
+				b_rook_left_moved = true
+			if not board[0][7] == -4:
+				b_rook_right_moved = true
 
 			# Troca o turno
 			white = not white
 
 			# Atualiza o tabuleiro
 			display_board()
+
+			if is_in_check(white):
+				print("Xeque!")
 
 			break
 
@@ -310,7 +329,13 @@ func get_moves():
 		6:
 			_moves = get_king_moves()
 
-	return _moves
+	# Remove os movimentos que deixam o próprio rei em xeque
+	var legal_moves = []
+	for move in _moves:
+		if not leaves_king_in_check(move):
+			legal_moves.append(move)
+
+	return legal_moves
 
 
 func get_rook_moves():
@@ -426,18 +451,19 @@ func get_king_moves():
 				_moves.append(pos)
 	
 	# Adiciona as posições do roque
+	# (não pode rocar em xeque nem passando por casa atacada)
 	if white:
-		if not w_king_moved:
-			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[7][7] == 4:
+		if not w_king_moved and not is_in_check(white):
+			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[7][7] == 4 and not w_rook_right_moved and not is_square_attacked(selected_piece + Vector2(0,1), not white):
 				_moves.append(selected_piece + Vector2(0,2))
-			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[7][0] == 4:
-				_moves.append(selected_piece + Vector2(0,-3))
+			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[7][0] == 4 and not w_rook_left_moved and not is_square_attacked(selected_piece + Vector2(0,-1), not white):
+				_moves.append(selected_piece + Vector2(0,-2))
 	else:
-		if not b_king_moved:
-			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[0][7] == -4:
+		if not b_king_moved and not is_in_check(white):
+			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[0][7] == -4 and not b_rook_right_moved and not is_square_attacked(selected_piece + Vector2(0,1), not white):
 				_moves.append(selected_piece + Vector2(0,2))
-			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[0][0] == -4:
-				_moves.append(selected_piece + Vector2(0,-3))
+			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[0][0] == -4 and not b_rook_left_moved and not is_square_attacked(selected_piece + Vector2(0,-1), not white):
+				_moves.append(selected_piece + Vector2(0,-2))
 
 	return _moves
 
@@ -571,12 +597,115 @@ func _on_button_pressed(button):
 	white = not white
 	display_board()
 
+	if is_in_check(white):
+		print("Xeque!")
+
 
 func roque(row: int,col: int):
 	if board[row][col + 1] == 4 or board[row][col + 1] == -4:
 		board[row][col-1] = board[row][col+1]
 		board[row][col+1] = 0
 	else:
-		if  board[row][col - 1] == 4 or board[row][col - 1] == -4:
-			board[row][col+1] = board[row][col-1]
-			board[row][col-1] = 0
+		if  board[row][col - 2] == 4 or board[row][col - 2] == -4:
+			board[row][col+1] = board[row][col-2]
+			board[row][col-2] = 0
+
+
+# Verifica se a casa "pos" é atacada por alguma peça da cor "by_white"
+func is_square_attacked(pos: Vector2, by_white: bool):
+	var s = 1 if by_white else -1
+
+	# Peões (o peão branco ataca para cima, então fica uma linha abaixo)
+	var pawn_row = pos.x + 1 if by_white else pos.x - 1
+	for p in [Vector2(pawn_row, pos.y + 1), Vector2(pawn_row, pos.y - 1)]:
+		if is_valid_position(p) and board[p.x][p.y] == 1 * s:
+			return true
+
+	# Cavalos
+	var knight_directions = [
+		Vector2(2, 1),
+		Vector2(2, -1),
+		Vector2(1, 2),
+		Vector2(1, -2),
+		Vector2(-2, 1),
+		Vector2(-2, -1),
+		Vector2(-1, 2),
+		Vector2(-1, -2)
+	]
+
+	for direction in knight_directions:
+		var p = pos + direction
+		if is_valid_position(p) and board[p.x][p.y] == 2 * s:
+			return true
+
+	# Rei, torre, bispo e rainha
+	var directions = [
+		Vector2(0, 1),
+		Vector2(0, -1),
+		Vector2(1, 0),
+		Vector2(-1, 0),
+		Vector2(1, 1),
+		Vector2(1, -1),
+		Vector2(-1, 1),
+		Vector2(-1, -1)
+	]
+
+	for direction in directions:
+		var straight = direction.x == 0 or direction.y == 0
+		var p = pos + direction
+		var distance = 1
+
+		while is_valid_position(p):
+			if not is_empty(p):
+				var piece = board[p.x][p.y]
+				if piece == 5 * s:
+					return true
+				if straight and piece == 4 * s:
+					return true
+				if not straight and piece == 3 * s:
+					return true
+				if distance == 1 and piece == 6 * s:
+					return true
+				break
+
+			p += direction
+			distance += 1
+
+	return false
+
+
+func is_in_check(is_white: bool):
+	var king = 6 if is_white else -6
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			if board[i][j] == king:
+				return is_square_attacked(Vector2(i, j), not is_white)
+
+	return false
+
+
+# Simula o movimento, verifica o rei e desfaz a simulação
+func leaves_king_in_check(move: Vector2):
+	var piece = board[selected_piece.x][selected_piece.y]
+	var captured = board[move.x][move.y]
+
+	# En passant: o peão capturado não está na casa de destino
+	var en_passant_capture = abs(piece) == 1 and move.y != selected_piece.y and captured == 0
+	var en_passant_piece = 0
+	if en_passant_capture:
+		en_passant_piece = board[selected_piece.x][move.y]
+		board[selected_piece.x][move.y] = 0
+
+	board[move.x][move.y] = piece
+	board[selected_piece.x][selected_piece.y] = 0
+
+	var in_check = is_in_check(white)
+
+	# Desfaz a simulação
+	board[selected_piece.x][selected_piece.y] = piece
+	board[move.x][move.y] = captured
+	if en_passant_capture:
+		board[selected_piece.x][move.y] = en_passant_piece
+
+	return in_check
