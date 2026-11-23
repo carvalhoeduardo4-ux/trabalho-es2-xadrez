@@ -64,6 +64,9 @@ var en_passant: Vector2 = Vector2(-1,-1)
 var promotion_square = null
 var game_over: bool = false
 
+var fifty_move_rule = 0
+var unique_board_moves : Array = []
+var amount_of_same : Array = []
 
 func _ready():
 	board.append([-4, -2, -3, -5, -6, -3, -2, -4])
@@ -84,6 +87,7 @@ func _ready():
 		
 	for button in black_buttons:
 		button.pressed.connect(self._on_button_pressed.bind(button))
+
 
 func _input(event):
 	if game_over:
@@ -274,7 +278,11 @@ func set_move(row: int, col: int):
 			else:
 				en_passant = Vector2(-1,-1)
 			
-			
+			# Lógica da Regra dos 50 Movimentos
+			fifty_move_rule += 1
+			if is_enemy(Vector2(row, col)) or abs(board[selected_piece.x][selected_piece.y]) == 1:
+				fifty_move_rule = 0
+
 			# Move a peça
 			board[row][col] = board[selected_piece.x][selected_piece.y]
 
@@ -307,7 +315,7 @@ func set_move(row: int, col: int):
 			# Atualiza o tabuleiro
 			display_board()
 
-			# Verifica xeque, xeque-mate e afogamento
+			# Verifica xeque, xeque-mate, afogamento e empates
 			check_game_state()
 
 			break
@@ -513,13 +521,11 @@ func get_pawn_moves():
 	elif not white and selected_piece.x == 1:
 		is_first_move = true
 
-
 	# Movimento para frente
 	var pos = selected_piece + direction
 
 	if is_valid_position(pos) and is_empty(pos):
 		_moves.append(pos)
-
 
 	# Movimento de duas casas
 	pos = selected_piece + direction * 2
@@ -528,13 +534,11 @@ func get_pawn_moves():
 		if is_empty(selected_piece + direction) and is_empty(pos):
 			_moves.append(pos)
 
-
 	# Captura diagonal direita
 	pos = selected_piece + Vector2(direction.x, 1)
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
-	
 	
 	# Verificar se é possível realizar o en passante pela direita
 	if white:
@@ -544,13 +548,11 @@ func get_pawn_moves():
 		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
 			_moves.append(pos)
 
-
 	# Captura diagonal esquerda
 	pos = selected_piece + Vector2(direction.x, -1)
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
-	
 	
 	# Verificar se é possível realizar o en passante pela esquerda
 	if white:
@@ -559,7 +561,6 @@ func get_pawn_moves():
 	else:
 		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
 			_moves.append(pos)
-	
 	
 	return _moves
 
@@ -585,32 +586,71 @@ func is_enemy(pos: Vector2):
 		return true
 
 	return false
-	
+
+
 func promote(_var : Vector2):
 	promotion_square = _var
 	board[selected_piece.x][selected_piece.y] = 0
 	white_pieces.visible = white
 	black_pieces.visible = !white
-	
+
+
 func _on_button_pressed(button):
 	var num_char = int(button.name.substr(0, 1))
 	board[promotion_square.x][promotion_square.y] = num_char if white else -num_char
 	white_pieces.visible = false
 	black_pieces.visible = false
 	promotion_square = null
+	fifty_move_rule = 0
 	white = not white
 	display_board()
 
-	# Verifica xeque, xeque-mate e afogamento
+	# Verifica xeque, xeque-mate, afogamento e empates
 	check_game_state()
 
 
-func roque(row: int,col: int):
+func insuficient_material() -> bool:
+	var white_piece = 0
+	var black_piece = 0
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			match board[i][j]:
+				2, 3:
+					if white_piece == 0:
+						white_piece += 1
+					else:
+						return false
+				-2, -3:
+					if black_piece == 0:
+						black_piece += 1
+					else:
+						return false
+				6, -6, 0:
+					pass
+				_:
+					return false
+	return true
+
+
+func threefold_position(var1 : Array) -> bool:
+	for i in unique_board_moves.size():
+		if var1 == unique_board_moves[i]:
+			amount_of_same[i] += 1
+			if amount_of_same[i] >= 3:
+				return true
+	unique_board_moves.append(var1.duplicate(true))
+	amount_of_same.append(1)
+	
+	return false
+
+
+func roque(row: int, col: int):
 	if board[row][col + 1] == 4 or board[row][col + 1] == -4:
 		board[row][col-1] = board[row][col+1]
 		board[row][col+1] = 0
 	else:
-		if  board[row][col - 2] == 4 or board[row][col - 2] == -4:
+		if board[row][col - 2] == 4 or board[row][col - 2] == -4:
 			board[row][col+1] = board[row][col-2]
 			board[row][col-2] = 0
 
@@ -733,14 +773,19 @@ func has_any_legal_move():
 
 # Chamada após cada lance, já com o turno trocado
 func check_game_state():
-	if has_any_legal_move():
+	if not has_any_legal_move():
+		game_over = true
 		if is_in_check(white):
-			print("Xeque!")
+			print("Xeque-mate! Pretas vencem" if white else "Xeque-mate! Brancas vencem")
+		else:
+			print("Afogamento! Empate")
 		return
 
-	game_over = true
+	# Verificações de Empate (50 lances, material insuficiente ou repetição tríplice)
+	if fifty_move_rule == 50 or insuficient_material() or threefold_position(board):
+		game_over = true
+		print("Empate!")
+		return
 
 	if is_in_check(white):
-		print("Xeque-mate! Pretas vencem" if white else "Xeque-mate! Brancas vencem")
-	else:
-		print("Afogamento! Empate")
+		print("Xeque!")
