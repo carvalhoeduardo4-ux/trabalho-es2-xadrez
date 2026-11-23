@@ -53,8 +53,16 @@ var white: bool = true
 var state: bool = false
 var moves: Array = []
 var selected_piece: Vector2
+var w_king_moved : bool = false
+var b_king_moved : bool = false
+var w_rook_left_moved : bool = false
+var w_rook_right_moved : bool = false
+var b_rook_left_moved : bool = false
+var b_rook_right_moved : bool = false
+var en_passant: Vector2 = Vector2(-1,-1)
 
 var promotion_square = null
+var game_over: bool = false
 
 var fifty_move_rule = 0
 var unique_board_moves : Array = []
@@ -80,7 +88,11 @@ func _ready():
 	for button in black_buttons:
 		button.pressed.connect(self._on_button_pressed.bind(button))
 
+
 func _input(event):
+	if game_over:
+		return
+
 	if event is InputEventMouseButton and event.pressed && promotion_square == null:
 		if event.button_index != MOUSE_BUTTON_LEFT:
 			return
@@ -251,8 +263,22 @@ func set_move(row: int, col: int):
 						delete_dots()
 						state = false
 						return
+
+			# Esvazia a posição sofrida pelo en passant
+			if en_passant == Vector2(row-1,col) and board[selected_piece.x][selected_piece.y] == 1:
+				board[row+1][col] = 0
+			elif en_passant == Vector2(row+1,col) and board[selected_piece.x][selected_piece.y] == -1:
+				board[row-1][col] = 0
 			
-			#Lógica da Regra dos 50 Movimentos
+			# Passagem do posto do en passante entre os peões da rodada
+			if white and board[selected_piece.x][selected_piece.y] == 1 and selected_piece.x == 6 and row == 4:
+				en_passant = selected_piece
+			elif not white and board[selected_piece.x][selected_piece.y] == -1 and selected_piece.x == 1 and row == 3:
+				en_passant = selected_piece
+			else:
+				en_passant = Vector2(-1,-1)
+			
+			# Lógica da Regra dos 50 Movimentos
 			fifty_move_rule += 1
 			if is_enemy(Vector2(row, col)) or abs(board[selected_piece.x][selected_piece.y]) == 1:
 				fifty_move_rule = 0
@@ -262,6 +288,26 @@ func set_move(row: int, col: int):
 
 			# Esvazia a posição antiga
 			board[selected_piece.x][selected_piece.y] = 0
+			
+			# Verifica se o rei se moveu
+			if not w_king_moved and white and not board[7][4] == 6:
+				w_king_moved = true
+				if abs(col - selected_piece.y) == 2:
+					roque(row, col)
+			if not b_king_moved and not white and not board[0][4] == -6:
+				b_king_moved = true
+				if abs(col - selected_piece.y) == 2:
+					roque(row, col)
+
+			# Verifica se as torres saíram (ou foram capturadas) da casa original
+			if not board[7][0] == 4:
+				w_rook_left_moved = true
+			if not board[7][7] == 4:
+				w_rook_right_moved = true
+			if not board[0][0] == -4:
+				b_rook_left_moved = true
+			if not board[0][7] == -4:
+				b_rook_right_moved = true
 
 			# Troca o turno
 			white = not white
@@ -269,9 +315,8 @@ func set_move(row: int, col: int):
 			# Atualiza o tabuleiro
 			display_board()
 
-			#Verificações de Empate (50 lances, material insuficiente ou repetição tríplice)
-			if fifty_move_rule == 50 or insuficient_material() or threefold_position(board):
-				print("draw)
+			# Verifica xeque, xeque-mate, afogamento e empates
+			check_game_state()
 
 			break
 
@@ -296,7 +341,13 @@ func get_moves():
 		6:
 			_moves = get_king_moves()
 
-	return _moves
+	# Remove os movimentos que deixam o próprio rei em xeque
+	var legal_moves = []
+	for move in _moves:
+		if not leaves_king_in_check(move):
+			legal_moves.append(move)
+
+	return legal_moves
 
 
 func get_rook_moves():
@@ -410,6 +461,21 @@ func get_king_moves():
 		if is_valid_position(pos):
 			if is_empty(pos) or is_enemy(pos):
 				_moves.append(pos)
+	
+	# Adiciona as posições do roque
+	# (não pode rocar em xeque nem passando por casa atacada)
+	if white:
+		if not w_king_moved and not is_in_check(white):
+			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[7][7] == 4 and not w_rook_right_moved and not is_square_attacked(selected_piece + Vector2(0,1), not white):
+				_moves.append(selected_piece + Vector2(0,2))
+			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[7][0] == 4 and not w_rook_left_moved and not is_square_attacked(selected_piece + Vector2(0,-1), not white):
+				_moves.append(selected_piece + Vector2(0,-2))
+	else:
+		if not b_king_moved and not is_in_check(white):
+			if is_empty(selected_piece + Vector2(0,1)) and is_empty(selected_piece + Vector2(0,2)) and board[0][7] == -4 and not b_rook_right_moved and not is_square_attacked(selected_piece + Vector2(0,1), not white):
+				_moves.append(selected_piece + Vector2(0,2))
+			if is_empty(selected_piece + Vector2(0,-1)) and is_empty(selected_piece + Vector2(0,-2)) and is_empty(selected_piece + Vector2(0,-3)) and board[0][0] == -4 and not b_rook_left_moved and not is_square_attacked(selected_piece + Vector2(0,-1), not white):
+				_moves.append(selected_piece + Vector2(0,-2))
 
 	return _moves
 
@@ -455,13 +521,11 @@ func get_pawn_moves():
 	elif not white and selected_piece.x == 1:
 		is_first_move = true
 
-
 	# Movimento para frente
 	var pos = selected_piece + direction
 
 	if is_valid_position(pos) and is_empty(pos):
 		_moves.append(pos)
-
 
 	# Movimento de duas casas
 	pos = selected_piece + direction * 2
@@ -470,20 +534,34 @@ func get_pawn_moves():
 		if is_empty(selected_piece + direction) and is_empty(pos):
 			_moves.append(pos)
 
-
 	# Captura diagonal direita
 	pos = selected_piece + Vector2(direction.x, 1)
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
-
+	
+	# Verificar se é possível realizar o en passante pela direita
+	if white:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x-1,pos.y):
+			_moves.append(pos)
+	else:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
+			_moves.append(pos)
 
 	# Captura diagonal esquerda
 	pos = selected_piece + Vector2(direction.x, -1)
 
 	if is_valid_position(pos) and is_enemy(pos):
 		_moves.append(pos)
-
+	
+	# Verificar se é possível realizar o en passante pela esquerda
+	if white:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x-1,pos.y):
+			_moves.append(pos)
+	else:
+		if is_valid_position(pos) and en_passant == Vector2(pos.x+1,pos.y):
+			_moves.append(pos)
+	
 	return _moves
 
 
@@ -508,21 +586,28 @@ func is_enemy(pos: Vector2):
 		return true
 
 	return false
-	
+
+
 func promote(_var : Vector2):
 	promotion_square = _var
 	board[selected_piece.x][selected_piece.y] = 0
 	white_pieces.visible = white
 	black_pieces.visible = !white
-	
+
+
 func _on_button_pressed(button):
 	var num_char = int(button.name.substr(0, 1))
 	board[promotion_square.x][promotion_square.y] = num_char if white else -num_char
 	white_pieces.visible = false
 	black_pieces.visible = false
 	promotion_square = null
+	fifty_move_rule = 0
 	white = not white
 	display_board()
+
+	# Verifica xeque, xeque-mate, afogamento e empates
+	check_game_state()
+
 
 func insuficient_material() -> bool:
 	var white_piece = 0
@@ -532,22 +617,175 @@ func insuficient_material() -> bool:
 		for j in BOARD_SIZE:
 			match board[i][j]:
 				2, 3:
-					if white_piece == 0: white_piece += 1
-					else: return false
+					if white_piece == 0:
+						white_piece += 1
+					else:
+						return false
 				-2, -3:
-					if black_piece == 0: black_piece += 1
-					else: return false
-				6, -6, 0: pass
+					if black_piece == 0:
+						black_piece += 1
+					else:
+						return false
+				6, -6, 0:
+					pass
 				_:
 					return false
 	return true
+
 
 func threefold_position(var1 : Array) -> bool:
 	for i in unique_board_moves.size():
 		if var1 == unique_board_moves[i]:
 			amount_of_same[i] += 1
-			if amount_of_same[i] >= 3: return true
+			if amount_of_same[i] >= 3:
+				return true
 	unique_board_moves.append(var1.duplicate(true))
 	amount_of_same.append(1)
 	
 	return false
+
+
+func roque(row: int, col: int):
+	if board[row][col + 1] == 4 or board[row][col + 1] == -4:
+		board[row][col-1] = board[row][col+1]
+		board[row][col+1] = 0
+	else:
+		if board[row][col - 2] == 4 or board[row][col - 2] == -4:
+			board[row][col+1] = board[row][col-2]
+			board[row][col-2] = 0
+
+
+# Verifica se a casa "pos" é atacada por alguma peça da cor "by_white"
+func is_square_attacked(pos: Vector2, by_white: bool):
+	var s = 1 if by_white else -1
+
+	# Peões (o peão branco ataca para cima, então fica uma linha abaixo)
+	var pawn_row = pos.x + 1 if by_white else pos.x - 1
+	for p in [Vector2(pawn_row, pos.y + 1), Vector2(pawn_row, pos.y - 1)]:
+		if is_valid_position(p) and board[p.x][p.y] == 1 * s:
+			return true
+
+	# Cavalos
+	var knight_directions = [
+		Vector2(2, 1),
+		Vector2(2, -1),
+		Vector2(1, 2),
+		Vector2(1, -2),
+		Vector2(-2, 1),
+		Vector2(-2, -1),
+		Vector2(-1, 2),
+		Vector2(-1, -2)
+	]
+
+	for direction in knight_directions:
+		var p = pos + direction
+		if is_valid_position(p) and board[p.x][p.y] == 2 * s:
+			return true
+
+	# Rei, torre, bispo e rainha
+	var directions = [
+		Vector2(0, 1),
+		Vector2(0, -1),
+		Vector2(1, 0),
+		Vector2(-1, 0),
+		Vector2(1, 1),
+		Vector2(1, -1),
+		Vector2(-1, 1),
+		Vector2(-1, -1)
+	]
+
+	for direction in directions:
+		var straight = direction.x == 0 or direction.y == 0
+		var p = pos + direction
+		var distance = 1
+
+		while is_valid_position(p):
+			if not is_empty(p):
+				var piece = board[p.x][p.y]
+				if piece == 5 * s:
+					return true
+				if straight and piece == 4 * s:
+					return true
+				if not straight and piece == 3 * s:
+					return true
+				if distance == 1 and piece == 6 * s:
+					return true
+				break
+
+			p += direction
+			distance += 1
+
+	return false
+
+
+func is_in_check(is_white: bool):
+	var king = 6 if is_white else -6
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			if board[i][j] == king:
+				return is_square_attacked(Vector2(i, j), not is_white)
+
+	return false
+
+
+# Simula o movimento, verifica o rei e desfaz a simulação
+func leaves_king_in_check(move: Vector2):
+	var piece = board[selected_piece.x][selected_piece.y]
+	var captured = board[move.x][move.y]
+
+	# En passant: o peão capturado não está na casa de destino
+	var en_passant_capture = abs(piece) == 1 and move.y != selected_piece.y and captured == 0
+	var en_passant_piece = 0
+	if en_passant_capture:
+		en_passant_piece = board[selected_piece.x][move.y]
+		board[selected_piece.x][move.y] = 0
+
+	board[move.x][move.y] = piece
+	board[selected_piece.x][selected_piece.y] = 0
+
+	var in_check = is_in_check(white)
+
+	# Desfaz a simulação
+	board[selected_piece.x][selected_piece.y] = piece
+	board[move.x][move.y] = captured
+	if en_passant_capture:
+		board[selected_piece.x][move.y] = en_passant_piece
+
+	return in_check
+
+
+# Verifica se o jogador da vez tem pelo menos um movimento legal
+func has_any_legal_move():
+	var original_selected = selected_piece
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			if (white and board[i][j] > 0) or (not white and board[i][j] < 0):
+				selected_piece = Vector2(i, j)
+				if not get_moves().is_empty():
+					selected_piece = original_selected
+					return true
+
+	selected_piece = original_selected
+	return false
+
+
+# Chamada após cada lance, já com o turno trocado
+func check_game_state():
+	if not has_any_legal_move():
+		game_over = true
+		if is_in_check(white):
+			print("Xeque-mate! Pretas vencem" if white else "Xeque-mate! Brancas vencem")
+		else:
+			print("Afogamento! Empate")
+		return
+
+	# Verificações de Empate (50 lances, material insuficiente ou repetição tríplice)
+	if fifty_move_rule == 50 or insuficient_material() or threefold_position(board):
+		game_over = true
+		print("Empate!")
+		return
+
+	if is_in_check(white):
+		print("Xeque!")
