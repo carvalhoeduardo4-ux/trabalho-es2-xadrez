@@ -62,6 +62,7 @@ var b_rook_right_moved : bool = false
 var en_passant: Vector2 = Vector2(-1,-1)
 
 var promotion_square = null
+var game_over: bool = false
 
 
 func _ready():
@@ -85,6 +86,9 @@ func _ready():
 		button.pressed.connect(self._on_button_pressed.bind(button))
 
 func _input(event):
+	if game_over:
+		return
+
 	if event is InputEventMouseButton and event.pressed && promotion_square == null:
 		if event.button_index != MOUSE_BUTTON_LEFT:
 			return
@@ -303,8 +307,8 @@ func set_move(row: int, col: int):
 			# Atualiza o tabuleiro
 			display_board()
 
-			if is_in_check(white):
-				print("Xeque!")
+			# Verifica xeque, xeque-mate e afogamento
+			check_game_state()
 
 			break
 
@@ -597,8 +601,8 @@ func _on_button_pressed(button):
 	white = not white
 	display_board()
 
-	if is_in_check(white):
-		print("Xeque!")
+	# Verifica xeque, xeque-mate e afogamento
+	check_game_state()
 
 
 func roque(row: int,col: int):
@@ -709,3 +713,34 @@ func leaves_king_in_check(move: Vector2):
 		board[selected_piece.x][move.y] = en_passant_piece
 
 	return in_check
+
+
+# Verifica se o jogador da vez tem pelo menos um movimento legal
+func has_any_legal_move():
+	var original_selected = selected_piece
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			if (white and board[i][j] > 0) or (not white and board[i][j] < 0):
+				selected_piece = Vector2(i, j)
+				if not get_moves().is_empty():
+					selected_piece = original_selected
+					return true
+
+	selected_piece = original_selected
+	return false
+
+
+# Chamada após cada lance, já com o turno trocado
+func check_game_state():
+	if has_any_legal_move():
+		if is_in_check(white):
+			print("Xeque!")
+		return
+
+	game_over = true
+
+	if is_in_check(white):
+		print("Xeque-mate! Pretas vencem" if white else "Xeque-mate! Brancas vencem")
+	else:
+		print("Afogamento! Empate")
