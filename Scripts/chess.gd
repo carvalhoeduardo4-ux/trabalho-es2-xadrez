@@ -61,6 +61,11 @@ var b_rook_left_moved : bool = false
 var b_rook_right_moved : bool = false
 var en_passant: Vector2 = Vector2(-1,-1)
 
+var vs_ai: bool = true
+var ai_plays_white: bool = false # false = IA joga de pretas, true = IA joga de brancas
+var ai_thinking: bool = false
+var ai_search_depth: int = 3 # Profundidade padrão (1 = muito fácil, 2 = casual, 3 = desafiador)
+
 var promotion_square = null
 var game_over: bool = false
 
@@ -88,8 +93,15 @@ func _ready():
 	for button in black_buttons:
 		button.pressed.connect(self._on_button_pressed.bind(button))
 
+	if vs_ai and white == ai_plays_white:
+		trigger_ai_turn()
 
 func _input(event):
+	if game_over or ai_thinking:
+		return
+	if vs_ai and white == ai_plays_white:
+		return
+	
 	if game_over:
 		return
 
@@ -317,7 +329,8 @@ func set_move(row: int, col: int):
 
 			# Verifica xeque, xeque-mate, afogamento e empates
 			check_game_state()
-
+			if vs_ai and not game_over and white == ai_plays_white:
+				trigger_ai_turn()
 			break
 
 	delete_dots()
@@ -591,6 +604,18 @@ func is_enemy(pos: Vector2):
 func promote(_var : Vector2):
 	promotion_square = _var
 	board[selected_piece.x][selected_piece.y] = 0
+	
+	# Se for a vez da IA, promove automaticamente (padrão: Rainha = 5)
+	if vs_ai and white == ai_plays_white:
+		var chosen_piece = choose_ai_promotion()
+		board[promotion_square.x][promotion_square.y] = chosen_piece if white else -chosen_piece
+		promotion_square = null
+		fifty_move_rule = 0
+		white = not white
+		display_board()
+		check_game_state()
+		return
+
 	white_pieces.visible = white
 	black_pieces.visible = !white
 
@@ -607,6 +632,8 @@ func _on_button_pressed(button):
 
 	# Verifica xeque, xeque-mate, afogamento e empates
 	check_game_state()
+	if vs_ai and not game_over and white == ai_plays_white:
+		trigger_ai_turn()
 
 
 func insuficient_material() -> bool:
@@ -789,3 +816,272 @@ func check_game_state():
 
 	if is_in_check(white):
 		print("Xeque!")
+		
+# ==========================================
+# INTELIGÊNCIA ARTIFICIAL (ADVERSÁRIO)
+# ==========================================
+
+func trigger_ai_turn():
+	ai_thinking = true
+	# Pequeno delay (0.4s) para o jogador conseguir ver o próprio lance antes da resposta
+	await get_tree().create_timer(0.4).timeout
+	
+	if game_over:
+		ai_thinking = false
+		return
+
+	var all_moves = get_all_legal_moves_for_current_turn()
+	
+	if not all_moves.is_empty():
+		var chosen = choose_best_move(all_moves)
+		execute_ai_move(chosen["from"], chosen["to"])
+		
+	ai_thinking = false
+
+
+# Retorna um Array de Dicionários: [{ "from": Vector2, "to": Vector2 }, ...]
+func get_all_legal_moves_for_current_turn() -> Array:
+	var all_moves: Array = []
+	var original_selected = selected_piece
+
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			if (white and board[i][j] > 0) or (not white and board[i][j] < 0):
+				selected_piece = Vector2(i, j)
+				var piece_moves = get_moves()
+				for target in piece_moves:
+					all_moves.append({
+						"from": Vector2(i, j),
+						"to": target
+					})
+
+	selected_piece = original_selected
+	return all_moves
+
+
+# PONTO DE EXTENSÃO: Escolhe o melhor lance usando Minimax com Poda Alpha-Beta
+func choose_best_move(all_moves: Array, depth: int = ai_search_depth) -> Dictionary:
+	var best_move: Dictionary = {}
+	var alpha: float = -INF
+	var beta: float = INF
+	
+	# Embaralha os lances para evitar partidas idênticas quando houver empate de pontuação
+	all_moves.shuffle()
+	
+	if white:
+		var max_eval: float = -INF
+		for move in all_moves:
+			var state_backup = make_simulated_move(move["from"], move["to"])
+			var eval = minimax(depth - 1, alpha, beta, false)
+			undo_simulated_move(state_backup)
+			
+			if eval > max_eval:
+				max_eval = eval
+				best_move = move
+			alpha = max(alpha, eval)
+	else:
+		var min_eval: float = INF
+		for move in all_moves:
+			var state_backup = make_simulated_move(move["from"], move["to"])
+			var eval = minimax(depth - 1, alpha, beta, true)
+			undo_simulated_move(state_backup)
+			
+			if eval < min_eval:
+				min_eval = eval
+				best_move = move
+			beta = min(beta, eval)
+			
+	return best_move
+
+
+func minimax(depth: int, alpha: float, beta: float, is_maximizing: bool) -> float:
+	if depth == 0:
+		return evaluate_board()
+		
+	var legal_moves = get_all_legal_moves_for_current_turn()
+	
+	# Fim de jogo na simulação (Xeque-mate ou Afogamento)
+	if legal_moves.is_empty():
+		if is_in_check(white):
+			# Adiciona 'depth' para a IA preferir mates mais rápidos e adiar derrotas
+			return (-100000.0 - depth) if is_maximizing else (100000.0 + depth)
+		return 0.0 # Empate por afogamento
+
+	if is_maximizing:
+		var max_eval: float = -INF
+		for move in legal_moves:
+			var state_backup = make_simulated_move(move["from"], move["to"])
+			var eval = minimax(depth - 1, alpha, beta, false)
+			undo_simulated_move(state_backup)
+			
+			max_eval = max(max_eval, eval)
+			alpha = max(alpha, eval)
+			if beta <= alpha:
+				break # Poda Beta
+		return max_eval
+	else:
+		var min_eval: float = INF
+		for move in legal_moves:
+			var state_backup = make_simulated_move(move["from"], move["to"])
+			var eval = minimax(depth - 1, alpha, beta, true)
+			undo_simulated_move(state_backup)
+			
+			min_eval = min(min_eval, eval)
+			beta = min(beta, eval)
+			if beta <= alpha:
+				break # Poda Alpha
+		return min_eval
+
+
+# ==========================================
+# AVALIAÇÃO E SIMULAÇÃO DE TABULEIRO
+# ==========================================
+
+# Retorna positivo se as Brancas estiverem em vantagem, negativo se as Pretas estiverem
+func evaluate_board() -> float:
+	var score: float = 0.0
+	
+	for i in BOARD_SIZE:
+		for j in BOARD_SIZE:
+			var piece = board[i][j]
+			if piece == 0:
+				continue
+				
+			var value: float = 0.0
+			match abs(piece):
+				1: value = 100.0
+				2: value = 320.0
+				3: value = 330.0
+				4: value = 500.0
+				5: value = 900.0
+				6: value = 20000.0
+				
+			# Pequeno bônus posicional para incentivar o controle do centro do tabuleiro
+			var center_bonus = (3.5 - abs(3.5 - i)) + (3.5 - abs(3.5 - j))
+			value += center_bonus * 2.0
+			
+			if piece > 0:
+				score += value
+			else:
+				score -= value
+				
+	return score
+
+
+# Executa um lance silenciosamente no tabuleiro e retorna um backup completo do estado
+func make_simulated_move(from: Vector2, to: Vector2) -> Dictionary:
+	var piece = board[from.x][from.y]
+	var captured = board[to.x][to.y]
+	
+	var backup = {
+		"from": from,
+		"to": to,
+		"piece": piece,
+		"captured": captured,
+		"white": white,
+		"en_passant": en_passant,
+		"w_king_moved": w_king_moved,
+		"b_king_moved": b_king_moved,
+		"w_rook_left_moved": w_rook_left_moved,
+		"w_rook_right_moved": w_rook_right_moved,
+		"b_rook_left_moved": b_rook_left_moved,
+		"b_rook_right_moved": b_rook_right_moved,
+		"en_passant_captured_pos": Vector2(-1, -1),
+		"en_passant_captured_piece": 0,
+		"rook_from": Vector2(-1, -1),
+		"rook_to": Vector2(-1, -1)
+	}
+	
+	# 1. Simula captura En Passant
+	if abs(piece) == 1 and to.y != from.y and captured == 0:
+		var ep_pos = Vector2(from.x, to.y)
+		backup["en_passant_captured_pos"] = ep_pos
+		backup["en_passant_captured_piece"] = board[ep_pos.x][ep_pos.y]
+		board[ep_pos.x][ep_pos.y] = 0
+		
+	# 2. Atualiza estado do En Passant para o próximo turno
+	if white and piece == 1 and from.x == 6 and to.x == 4:
+		en_passant = from
+	elif not white and piece == -1 and from.x == 1 and to.x == 3:
+		en_passant = from
+	else:
+		en_passant = Vector2(-1, -1)
+		
+	# 3. Move a peça (e simula promoção automática para Rainha na busca)
+	if piece == 1 and to.x == 0:
+		board[to.x][to.y] = 5
+	elif piece == -1 and to.x == 7:
+		board[to.x][to.y] = -5
+	else:
+		board[to.x][to.y] = piece
+		
+	board[from.x][from.y] = 0
+	
+	# 4. Simula Roque (move a torre correspondente)
+	if abs(piece) == 6 and abs(to.y - from.y) == 2:
+		if to.y == 6: # Roque pequeno
+			backup["rook_from"] = Vector2(from.x, 7)
+			backup["rook_to"] = Vector2(from.x, 5)
+		elif to.y == 2: # Roque grande
+			backup["rook_from"] = Vector2(from.x, 0)
+			backup["rook_to"] = Vector2(from.x, 3)
+			
+		var r_from = backup["rook_from"]
+		var r_to = backup["rook_to"]
+		board[r_to.x][r_to.y] = board[r_from.x][r_from.y]
+		board[r_from.x][r_from.y] = 0
+		
+	# 5. Atualiza flags de movimentação de Rei e Torres
+	if piece == 6: w_king_moved = true
+	if piece == -6: b_king_moved = true
+	if board[7][0] != 4: w_rook_left_moved = true
+	if board[7][7] != 4: w_rook_right_moved = true
+	if board[0][0] != -4: b_rook_left_moved = true
+	if board[0][7] != -4: b_rook_right_moved = true
+	
+	# Passa a vez na simulação
+	white = not white
+	
+	return backup
+
+
+# Restaura o tabuleiro exatamente ao estado anterior à simulação
+func undo_simulated_move(backup: Dictionary):
+	var from = backup["from"]
+	var to = backup["to"]
+	
+	board[from.x][from.y] = backup["piece"]
+	board[to.x][to.y] = backup["captured"]
+	
+	# Restaura peão capturado por En Passant
+	var ep_pos = backup["en_passant_captured_pos"]
+	if ep_pos != Vector2(-1, -1):
+		board[ep_pos.x][ep_pos.y] = backup["en_passant_captured_piece"]
+		
+	# Restaura torre movida no Roque
+	var r_from = backup["rook_from"]
+	if r_from != Vector2(-1, -1):
+		var r_to = backup["rook_to"]
+		board[r_from.x][r_from.y] = board[r_to.x][r_to.y]
+		board[r_to.x][r_to.y] = 0
+		
+	# Restaura flags globais
+	white = backup["white"]
+	en_passant = backup["en_passant"]
+	w_king_moved = backup["w_king_moved"]
+	b_king_moved = backup["b_king_moved"]
+	w_rook_left_moved = backup["w_rook_left_moved"]
+	w_rook_right_moved = backup["w_rook_right_moved"]
+	b_rook_left_moved = backup["b_rook_left_moved"]
+	b_rook_right_moved = backup["b_rook_right_moved"]
+
+
+# PONTO DE EXTENSÃO: Escolha de peça na promoção (5 = Rainha, 4 = Torre, 3 = Bispo, 2 = Cavalo)
+func choose_ai_promotion() -> int:
+	return 5
+
+
+func execute_ai_move(from: Vector2, to: Vector2):
+	selected_piece = from
+	moves = get_moves() # Popula 'moves' para a validação interna de set_move()
+	set_move(int(to.x), int(to.y))
