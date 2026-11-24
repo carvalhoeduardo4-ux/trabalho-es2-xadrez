@@ -27,8 +27,9 @@ const PIECE_MOVE = preload("res://Assets/Piece_move.png")
 const TURN_BLACK = preload("res://Assets/turn-black.png")
 const TURN_WHITE = preload("res://Assets/turn-white.png")
 
-# Substitua pelo caminho real do seu arquivo de áudio (.wav, .ogg ou .mp3)
+# Substitua pelos caminhos reais dos seus arquivos de áudio (.wav, .ogg ou .mp3)
 const MOVE_SOUND = preload("res://Assets/move-self.mp3")
+const CAPTURE_SOUND = preload("res://Assets/capture.mp3")
 
 @onready var pieces: Node2D = $pieces
 @onready var dots: Node2D = $dots
@@ -37,6 +38,7 @@ const MOVE_SOUND = preload("res://Assets/move-self.mp3")
 @onready var black_pieces: Control = $"../../CanvasLayer/black_pieces"
 
 var move_audio_player: AudioStreamPlayer
+var pending_promotion_capture: bool = false
 
 # -6 = Rei preto
 # -5 = Rainha preta
@@ -80,7 +82,6 @@ var amount_of_same : Array = []
 func _ready():
 	# Configura o player de áudio automaticamente
 	move_audio_player = AudioStreamPlayer.new()
-	move_audio_player.stream = MOVE_SOUND
 	add_child(move_audio_player)
 
 	board.append([-4, -2, -3, -5, -6, -3, -2, -4])
@@ -104,6 +105,12 @@ func _ready():
 
 	if vs_ai and white == ai_plays_white:
 		trigger_ai_turn()
+
+
+func play_move_sound(is_capture: bool):
+	move_audio_player.stream = CAPTURE_SOUND if is_capture else MOVE_SOUND
+	move_audio_player.play()
+
 
 func _input(event):
 	if game_over or ai_thinking:
@@ -271,15 +278,22 @@ func set_move(row: int, col: int):
 	# Verifica se a posição clicada é um movimento válido
 	for move in moves:
 		if move.x == row and move.y == col:
+			# Verifica se o lance resulta em captura (normal ou en passant)
+			var is_capture: bool = is_enemy(Vector2(row, col))
+			if abs(board[selected_piece.x][selected_piece.y]) == 1 and col != selected_piece.y and board[row][col] == 0:
+				is_capture = true
+
 			match board[selected_piece.x][selected_piece.y]:
 				1:
 					if move.x == 0:
+						pending_promotion_capture = is_capture
 						promote(move)
 						delete_dots()
 						state = false
 						return
 				-1:
 					if move.x == 7:
+						pending_promotion_capture = is_capture
 						promote(move)
 						delete_dots()
 						state = false
@@ -301,7 +315,7 @@ func set_move(row: int, col: int):
 			
 			# Lógica da Regra dos 50 Movimentos
 			fifty_move_rule += 1
-			if is_enemy(Vector2(row, col)) or abs(board[selected_piece.x][selected_piece.y]) == 1:
+			if is_capture or abs(board[selected_piece.x][selected_piece.y]) == 1:
 				fifty_move_rule = 0
 
 			# Move a peça
@@ -333,9 +347,9 @@ func set_move(row: int, col: int):
 			# Troca o turno
 			white = not white
 
-			# Atualiza o tabuleiro e toca o som de movimento
+			# Atualiza o tabuleiro e toca o som correspondente
 			display_board()
-			move_audio_player.play()
+			play_move_sound(is_capture)
 
 			# Verifica xeque, xeque-mate, afogamento e empates
 			check_game_state()
@@ -623,7 +637,8 @@ func promote(_var : Vector2):
 		fifty_move_rule = 0
 		white = not white
 		display_board()
-		move_audio_player.play()
+		play_move_sound(pending_promotion_capture)
+		pending_promotion_capture = false
 		check_game_state()
 		return
 
@@ -640,7 +655,8 @@ func _on_button_pressed(button):
 	fifty_move_rule = 0
 	white = not white
 	display_board()
-	move_audio_player.play()
+	play_move_sound(pending_promotion_capture)
+	pending_promotion_capture = false
 
 	# Verifica xeque, xeque-mate, afogamento e empates
 	check_game_state()
