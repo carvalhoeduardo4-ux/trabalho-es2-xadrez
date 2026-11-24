@@ -92,6 +92,7 @@ func _ready():
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
 	board.append([1, 1, 1, 1, 1, 1, 1, 1])
 	board.append([4, 2, 3, 5, 6, 3, 2, 4])
+	threefold_position(board)  # a posição inicial conta como 1ª ocorrência
 	display_board()
 	
 	var white_buttons = get_tree().get_nodes_in_group("white_pieces")
@@ -837,7 +838,7 @@ func check_game_state():
 		return
 
 	# Verificações de Empate (50 lances, material insuficiente ou repetição tríplice)
-	if fifty_move_rule == 50 or insuficient_material() or threefold_position(board):
+	if fifty_move_rule >= 100 or insuficient_material() or threefold_position(board):
 		game_over = true
 		print("Empate!")
 		return
