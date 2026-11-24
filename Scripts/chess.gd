@@ -27,12 +27,16 @@ const PIECE_MOVE = preload("res://Assets/Piece_move.png")
 const TURN_BLACK = preload("res://Assets/turn-black.png")
 const TURN_WHITE = preload("res://Assets/turn-white.png")
 
+# Substitua pelo caminho real do seu arquivo de áudio (.wav, .ogg ou .mp3)
+const MOVE_SOUND = preload("res://Assets/move-self.mp3")
+
 @onready var pieces: Node2D = $pieces
 @onready var dots: Node2D = $dots
 @onready var turn: Sprite2D = $turn
 @onready var white_pieces: Control = $"../../CanvasLayer/white_pieces"
 @onready var black_pieces: Control = $"../../CanvasLayer/black_pieces"
 
+var move_audio_player: AudioStreamPlayer
 
 # -6 = Rei preto
 # -5 = Rainha preta
@@ -74,6 +78,11 @@ var unique_board_moves : Array = []
 var amount_of_same : Array = []
 
 func _ready():
+	# Configura o player de áudio automaticamente
+	move_audio_player = AudioStreamPlayer.new()
+	move_audio_player.stream = MOVE_SOUND
+	add_child(move_audio_player)
+
 	board.append([-4, -2, -3, -5, -6, -3, -2, -4])
 	board.append([-1, -1, -1, -1, -1, -1, -1, -1])
 	board.append([0, 0, 0, 0, 0, 0, 0, 0])
@@ -324,8 +333,9 @@ func set_move(row: int, col: int):
 			# Troca o turno
 			white = not white
 
-			# Atualiza o tabuleiro
+			# Atualiza o tabuleiro e toca o som de movimento
 			display_board()
+			move_audio_player.play()
 
 			# Verifica xeque, xeque-mate, afogamento e empates
 			check_game_state()
@@ -613,6 +623,7 @@ func promote(_var : Vector2):
 		fifty_move_rule = 0
 		white = not white
 		display_board()
+		move_audio_player.play()
 		check_game_state()
 		return
 
@@ -629,6 +640,7 @@ func _on_button_pressed(button):
 	fifty_move_rule = 0
 	white = not white
 	display_board()
+	move_audio_player.play()
 
 	# Verifica xeque, xeque-mate, afogamento e empates
 	check_game_state()
