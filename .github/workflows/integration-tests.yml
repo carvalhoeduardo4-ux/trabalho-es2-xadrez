@@ -1,3 +1,4 @@
+
 name: Testes de Integração - Xadrez
 
 on:
@@ -12,12 +13,15 @@ jobs:
     # Conjuntos de testes de cada incremento (integração bottom-up)
     env:
       GUT: godot --headless --path . -s res://addons/gut/gut_cmdln.gd -gexit
-      T1: res://tests/integration/test_inc1_tabuleiro_movimentos.gd
-      T2: res://tests/integration/test_inc2_validacao.gd
-      T3: res://tests/integration/test_inc3_execucao.gd
-      T4: res://tests/integration/test_inc4_estado_partida.gd
-      T5: res://tests/integration/test_inc5_interface.gd
-      T6: res://tests/integration/test_inc6_entrada_promocao.gd
+      T1: res://tests/integration/engine/test_inc1_tabuleiro_movimentos.gd
+      T2: res://tests/integration/engine/test_inc2_validacao.gd
+      T3: res://tests/integration/engine/test_inc3_execucao.gd
+      T4: res://tests/integration/engine/test_inc4_estado_partida.gd
+      T5: res://tests/integration/engine/test_inc5_ia.gd
+      T6: res://tests/integration/interface/test_inc6_renderizacao_som.gd
+      T7: res://tests/integration/interface/test_inc7_entrada.gd
+      T8: res://tests/integration/interface/test_inc8_promocao.gd
+      T9: res://tests/integration/sistema/test_inc9_sistema_completo.gd
 
     steps:
       - name: Baixar repositório
@@ -37,23 +41,45 @@ jobs:
       # anteriores são executados de novo junto com os testes novos.
       # Se um passo falhar, os seguintes não são executados.
 
-      - name: "Passo 1: T1 (M1 + M2)"
+      # ---------- ENGINE ----------
+      - name: "Passo 1: T1 (M1 tabuleiro + M2 movimentos)"
         run: $GUT -gtest=$T1
 
       - name: "Passo 2: T1 + T2 (+ M3 validação)"
         run: $GUT -gtest=$T1,$T2
 
-      - name: "Passo 3: T1 + T2 + T3 (+ M4 execução)"
+      - name: "Passo 3: T1 a T3 (+ M4 execução)"
         run: $GUT -gtest=$T1,$T2,$T3
 
       - name: "Passo 4: T1 a T4 (+ M5 estado da partida)"
         run: $GUT -gtest=$T1,$T2,$T3,$T4
 
-      - name: "Passo 5: T1 a T5 (+ M6 interface)"
+      - name: "Passo 5: T1 a T5 (+ M6 IA)"
         run: $GUT -gtest=$T1,$T2,$T3,$T4,$T5
 
-      - name: "Passo 6: T1 a T6 (+ M7 entrada e M8 promoção)"
+      # ---------- INTERFACE ----------
+      - name: "Passo 6: T1 a T6 (+ M7 renderização e som)"
         run: $GUT -gtest=$T1,$T2,$T3,$T4,$T5,$T6
 
-      - name: Executar todos os testes de integração
-        run: $GUT -gdir=res://tests/integration
+      - name: "Passo 7: T1 a T7 (+ M8 entrada)"
+        run: $GUT -gtest=$T1,$T2,$T3,$T4,$T5,$T6,$T7
+
+      - name: "Passo 8: T1 a T8 (+ M9 promoção)"
+        run: $GUT -gtest=$T1,$T2,$T3,$T4,$T5,$T6,$T7,$T8
+
+      # ---------- SISTEMA ----------
+      - name: "Passo 9: T1 a T9 (+ M10 menu, sistema completo)"
+        run: $GUT -gtest=$T1,$T2,$T3,$T4,$T5,$T6,$T7,$T8,$T9
+
+      - name: Executar todos os testes de integração (com cobertura)
+        run: >
+          $GUT -gdir=res://tests/integration -ginclude_subdirs
+          -gpre_run_script=res://tools/cobertura/pre_run_hook.gd
+          -gpost_run_script=res://tools/cobertura/post_run_hook.gd
+
+      - name: Publicar relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: cobertura/

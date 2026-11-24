@@ -8,3 +8,5 @@
 # Arquivos temporários do Windows
 *:Zone.Identifier
 Zone.Identifier
+# Relatórios de cobertura gerados pelos testes
+/cobertura/
