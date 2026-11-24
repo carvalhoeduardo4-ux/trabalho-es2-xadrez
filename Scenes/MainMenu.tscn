@@ -1,7 +1,10 @@
 [gd_scene format=3 uid="uid://c1xjatkyvbhoi"]
 
 [ext_resource type="Script" uid="uid://b83bal3032qpe" path="res://Scripts/main_menu.gd" id="1_tt5f1"]
-[ext_resource type="Texture2D" uid="uid://b6nyk0d700pjw" path="res://Assets/white.webp" id="2_853f1"]
+[ext_resource type="Texture2D" uid="uid://djhenwsxh45wo" path="res://Assets/betidraws-chess-8348280.jpg" id="2_853f1"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_853f1"]
+load_path = "res://.godot/imported/b-pasha.png-f63afbb1c3255826007ff5fdb76b742c.ctex"
 
 [node name="MainMenu" type="Control" unique_id=1930723350]
 layout_mode = 3
@@ -14,9 +17,10 @@ script = ExtResource("1_tt5f1")
 
 [node name="BackgroundImage" type="TextureRect" parent="." unique_id=1755641909]
 layout_mode = 1
-offset_right = 2633.0
-offset_bottom = 1542.0
+offset_right = 1312.0
+offset_bottom = 860.0
 texture = ExtResource("2_853f1")
+expand_mode = 2
 stretch_mode = 6
 
 [node name="CenterContainer" type="CenterContainer" parent="." unique_id=575155222]
@@ -29,10 +33,13 @@ grow_vertical = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=222994622]
 layout_mode = 2
+theme_override_constants/separation = 50
 
 [node name="PlayButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=752971951]
 layout_mode = 2
+theme_override_constants/icon_max_width = 45
 text = "JOGAR"
+icon = SubResource("CompressedTexture2D_853f1")
 
 [node name="QuitButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=380499999]
 layout_mode = 2

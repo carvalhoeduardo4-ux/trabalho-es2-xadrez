@@ -1,7 +1,10 @@
-# Godot 4+ specific ignores
+# Godot 4+
 .godot/
 /android/
 
-# Ignore Windows Zone Identifier streams
+# Arquivos de importação gerados pelo Godot
+*.import
+
+# Arquivos temporários do Windows
 *:Zone.Identifier
 Zone.Identifier
